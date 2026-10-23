@@ -1,0 +1,36 @@
+To dive deeper into the **Variable Length Coding (VLC) lookup tables** used in MPEG-2 video decoding, we have to look at how Huffman coding is structured at the bit level.
+
+Because certain visual patterns, motion vectors, and coefficient values occur much more frequently than others in natural video, MPEG-2 replaces fixed-width binary codes with variable-length bit patterns. Shorter binary codes are assigned to frequent values, and longer codes are assigned to rare values, drastically shrinking the overall file size.
+
+Here are the specific lookup tables used during MPEG-2 binary video translation:
+
+---
+
+### 1. Macroblock Type (`mb_type`) Lookup Tables
+
+When the parser enters a macroblock, it reads a variable-length bit prefix to determine how the block is structured. Because different picture types (I, P, B) have different operational rules, the MPEG-2 specification maintains separate VLC tables for each:
+
+* **I-Frame Macroblock Table:** Tells the decoder whether the block contains spatial quantization changes, custom weighting matrices, or motion flags (though motion flags are zero for I-frames).
+* **P-Frame and B-Frame Tables:** These tables map short bit sequences to complex multi-flag states—for instance, telling the hardware: *"This macroblock is forward-predicted, contains a motion vector, skips its chroma blocks, but includes a coded block pattern for the luma data."*
+
+### 2. Motion Vector Code (`motion_code`) Tables
+
+As we explored with differential motion vectors (`motion_code`), the binary stream does not store coordinate integers directly. Instead, it uses a dedicated VLC lookup table optimized for small motion shifts:
+
+* **Short Shifts:** Tiny movements (like a block shifting $0$ or $\pm 1$ pixel) are assigned very short bit sequences (e.g., a code like `1` or `010`).
+* **Large Shifts:** Rapid camera pans or fast-moving objects require larger vector differences. The table maps these to longer bit prefixes, terminating with an appended residual sign bit.
+* **The `dmvector` Table (B-Frames):** For dual-prime field motion compensation in B-frames, a specialized sub-table maps tiny $-1, 0, +1$ directional adjustments between adjacent fields.
+
+### 3. Discrete Cosine Transform (DCT) Coefficient Tables
+
+Once the $8\times8$ frequency block is dequantized and scanned via the zig-zag path, non-zero coefficients are decoded using run-level VLC tables (`dct_coefficients_table`).
+
+* **Run-Length Combinations:** Instead of storing separate tables for every possible number of leading zeros (Run) and coefficient amplitude (Level), MPEG-2 packs them into joint Huffman trees. For example, a common occurrence like "one zero followed by a level of 1" might map to a 2-bit code, whereas a rare combination maps to a much longer code.
+* **First DC Coefficient Tables:** For intra-coded blocks, the very first DC coefficient uses a unique pair of tables (`dct_dc_size_luminance` and `dct_dc_size_chrominance`) to unpack the base brightness size before the standard AC run-level tables take over.
+
+### 4. Macroblock Address Increment (`mac_addr_inc`) Table
+
+When macroblocks are skipped (because an area of the image hasn't changed from the reference frame), the stream uses an increment table to tell the parser how many blocks to jump forward:
+
+* A jump of 1 skipped block might be encoded with a simple 1-bit or 2-bit code.
+* Longer skips (e.g., skipping an entire static background row) use longer bit sequences ending with specific marker prefixes. If a skip is massive, the parser reads a special "macroblock escape" code (`0000 0001 000`) which instructs it to add a flat fixed increment of 33 blocks before reading the next sequence.

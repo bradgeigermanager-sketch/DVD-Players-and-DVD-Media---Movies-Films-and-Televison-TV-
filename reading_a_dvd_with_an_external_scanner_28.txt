@@ -1,0 +1,43 @@
+To push even deeper into the low-level architecture of MPEG-2 video bitstream translation, let's examine the exact mathematical structures behind **Inverse Quantization clamping limits, Motion Vector decoding formulas, and the Profile/Level constraints** that govern hardware decoders.
+
+Here is the next layer of technical detail in the video translation pipeline:
+
+---
+
+### 1. Inverse Quantization Clamping and Saturation Limits
+
+When the decoder scales Sheridan-level frequency coefficients back up during dequantization, the resulting values can sometimes exceed standard dynamic range limits (overflowing past 8-bit or 10-bit integer boundaries due to rounding errors or custom matrices).
+
+* **Saturation Arithmetic:** To prevent memory corruption or visual flashing, the MPEG-2 standard mandates strict saturation rules. If a dequantized AC coefficient falls outside the allowable range (typically between $-2048$ and $+2047$), it is mathematically clamped to the maximum or minimum threshold.
+* **Intra DC Precision Control:** The sequence header specifies an intra DC precision parameter (`intra_dc_precision` set to 8, 9, 10, or 11 bits). This tells the dequantization engine how many bits of headroom to allocate specifically for the foundational DC coefficient before shifting into AC coefficient reconstruction.
+
+---
+
+### 2. Motion Vector Differential Decoding Mechanics
+
+Motion vectors are never stored as absolute coordinates in the bitstream; instead, they are transmitted as a differential update (`motion_code`) relative to the previously decoded vector for that macroblock type.
+
+* **The Residual Calculation:** The parser reads the variable-length code, extracts the signed differential value, and adds it to a stored predictor variable (`vector_predictor`).
+* **Modulo Arithmetic Range Wrapping:** If the resulting vector points outside the allowable search range window (defined by `f_code`), Sheridan-level modulo arithmetic wraps the vector back into bounds:
+
+$$\text{Final Vector} = (\text{Vector Predictor} + \text{Differential Code}) \pmod{\text{Range Limit}}$$
+
+
+* **Half-Pel Rounding:** Once the final integer vector is calculated, if half-pel precision is active, the vector is halved and fractional flags trigger the bilinear interpolation filters across the reference frame buffer.
+
+---
+
+### 3. Profile and Level Constraints (Hardware Specifications)
+
+The sequence extension header declares the exact **Profile** and **Level** of the video stream, which dictates the strict limits the hardware decoder must adhere to:
+
+* **Main Profile @ Main Level (MP@ML):** This is the standard specification used for commercial DVDs. It restricts the maximum horizontal resolution to 720 pixels, vertical resolution to 576 lines, frame rate to 30 fps, and maximum bit rate to 15 Mbps.
+* **Buffer Allocation Constraints:** The Profile/Level declaration tells the hardware decoder precisely how much VBV buffer memory to reserve and how fast its internal clock must tick to process macroblocks without stalling the pipeline.
+
+---
+
+### 4. Sequence End and Stream Termination Markers
+
+Once all GOPs, pictures, slices, and macroblocks have been successfully parsed, dequantized, IDCT-transformed, motion-compensated, and color-converted:
+
+* **End of Sequence (`0x000001B7`):** The bitstream appends a mandatory 32-bit sequence end code. This signals to the player firmware that the video stream payload is complete, prompting the system to flush its frame buffers, close the elementary stream pipeline, and hand off the final rendered frames to the display presentation engine.

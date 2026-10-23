@@ -1,0 +1,46 @@
+When you look at the directory structure of a standard commercial DVD, you won’t actually find raw `.mpg` or `.ac3` files sitting in the root directory. Instead, the disc is organized into a strict hierarchical file system (typically UDF - Universal Disk Format) governed by two primary types of files stored inside the `VIDEO_TS` folder: **IFO (Information) files** and **VOB (Video Object) files**.
+
+Here is the deep-dive technical breakdown of how these authoring structures are organized and how they hold your media tracks together on the physical disc:
+
+---
+
+### 1. The Directory Layout and File Types
+
+Inside the `VIDEO_TS` folder, the file names follow a precise numbering scheme:
+
+* **`VIDEO_TS.IFO` & `VIDEO_TS.VOB`:** The startup/menu control file and its associated video assets.
+* **`VTS_01_0.IFO`, `VTS_01_0.VOB`, `VTS_01_1.VOB`, etc.:** The files belonging to Video Title Set 1 (main movie, trailers, or specific features). The `_0` files generally contain menu states and navigational control, while the numbered files (`_1.VOB`, `_2.VOB`, etc.) hold the actual movie data, split into chunks of roughly 1 GB to ensure compatibility with older file system limits.
+
+---
+
+### 2. IFO Files: The Navigation and Control Brain
+
+An **IFO (Information) file** contains zero audio or video frames. Instead, it is a binary database containing all the navigational commands, timing maps, pointers, and attributes that tell the DVD player *how* to play the content.
+
+* **VMGM (Video Manager Menu) vs. VTS (Video Title Set):** The IFO maps out the logical structure, dividing the disc into Titles (e.g., Title 1 is the movie, Title 2 is a special feature) and Chapters (Parts of Title - PTT).
+* **Command Tables:** It contains bytecode instructions that dictate what happens when you press buttons on your remote (e.g., *"If the user clicks 'Play Movie', jump to Program Chain 1"*).
+* **Playback Attributes:** It stores explicit metadata structures telling the player:
+* Audio language tracks available (e.g., track 1 is English AC-3 5.1, track 2 is French).
+* Subtitle availability and default states.
+* Aspect ratio flags (widescreen vs. fullscreen).
+* Parental control restrictions and angle maps.
+
+
+
+---
+
+### 3. VOB Files: The Interleaved Data Container
+
+A **VOB (Video Object) file** is physically where the MPEG Program Stream data lives. However, unlike a standard `.mpg` file you download on a computer, a DVD VOB file uses a specialized, heavily multiplexed structure designed for optical drives.
+
+* **Packetized Elementary Streams (PES):** Inside a VOB file, video packets (`.m2v`), audio packets (`.ac3`), and sub-picture (subtitle) packets are chopped into small, interleaved chunks and packed together tightly in chronological order based on their playback timestamps.
+* **Navigation Packs (`NV_PCK`):** Interspersed directly inside the VOB stream are special navigation packs. These packets contain real-time button highlight coordinates for interactive menus and pointers that allow the laser to instantly jump forward or backward to specific sector addresses when you seek or skip chapters.
+* **Seamless Playback Pointers:** Because camera angles or branching paths require the laser to jump across physical sectors on the disc without audio hiccups or video stuttering, the VOB stream embeds precise sector-address mapping tables so the drive's firmware knows exactly where to move the tracking head next.
+
+---
+
+### Summary of How Authoring Structures Work Together
+
+1. **The Player Starts:** The hardware reads `VIDEO_TS.IFO` to understand the menu structure and global settings.
+2. **User Interaction:** When you press "Play," the IFO points the player to `VTS_01_0.IFO` for the specific title rules.
+3. **Stream Execution:** The player begins streaming data from `VTS_01_1.VOB`, parsing the interleaved VOB packets, reading the embedded System Clock References (SCR), separating the video, audio, and subtitles, and sending them down their respective decoding pipelines.

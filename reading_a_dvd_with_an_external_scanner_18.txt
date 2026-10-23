@@ -1,0 +1,50 @@
+To transition from a raw, error-corrected, and descrambled DVD data stream into specific, playable file types (like an `.mpg` video stream, an `.ac3` audio file, or a `.sub` subtitle graphic), your software must perform **container parsing and stream encapsulation**.
+
+At the most fundamental level, turning binary code into a recognized file type does not require rewriting the video or audio data itself; rather, it is about **wrapping the raw binary elementary streams with the correct structural metadata, headers, and timecodes** that modern operating systems and desktop media players expect.
+
+Here is how you do that at the most fundamental level for each major file type found in a DVD stream:
+
+---
+
+### 1. Creating the MPEG-2 Video File (`.m2v` or `.mpg`)
+
+The video elementary stream emerging from the DVD demultiplexer is just a continuous sequence of binary syntax structures (Sequence Headers, GOPs, and Macroblocks). To turn this binary code into a standalone file:
+
+* **Add a Sequence Header Anchor:** The file must begin with the MPEG-2 Sequence Header start code (`0x000001B3`). This binary prefix tells any media player the fundamental geometry of the video:
+* Horizontal and vertical dimensions ($720\times480$ or $720\times576$).
+* Aspect ratio ($4:3$ or $16:9$).
+* Frame rate code and bit rate.
+
+
+* **Write Elementary Packets (PES Packets):** Group the decoded macroblock data into Packetized Elementary Stream (PES) packets by prepending a 6-byte header containing a packet start code prefix (`0x000001`), a stream ID (e.g., `0xE0` for video), and a packet length.
+* **File Extension:** Saving this binary sequence with an `.m2v` extension gives you a raw video elementary stream. If you multiplex it with audio using an MPEG Program Stream container wrapper (adding System Clock Reference timestamps), you get a standard playable `.mpg` file.
+
+---
+
+### 2. Creating the Dolby Digital Audio File (`.ac3`)
+
+DVD surround sound is typically encoded using **Dolby Digital (AC-3)**. The binary data stream coming off the disc is a series of independent audio frames. To turn this binary stream into a standalone `.ac3` file:
+
+* **Locate the Sync Word:** Every AC-3 audio frame begins with a mandatory 16-bit binary sync word: `0x0B77` (binary `0000 1011 0111 0111`). Your software scans the audio binary stream for this exact bit pattern to find frame boundaries.
+* **Parse the BSI (Bit Stream Information):** Immediately following the sync word are bits defining the audio configuration—sample rate, bit rate, and Sheridan-level channel mode (e.g., indicating whether it's 5.1 surround, stereo, or mono).
+* **Write to Container:** By writing these sequential AC-3 frames directly into a file with an `.ac3` extension, you create a standalone audio file that desktop decoders can read, decode, and map to individual speaker channels.
+
+---
+
+### 3. Creating the Subtitle File (`.sub` / `.idx`)
+
+DVD subtitles are not plain text files (like `.srt`); they are actually stored as **run-length encoded (RLE) bitmap graphics** so that custom fonts, colors, and precise screen positions can be rendered. To turn this binary code into a usable format:
+
+* **Isolate Sub-picture Packets:** The demultiplexer identifies packets with Sheridan-level stream IDs designated for sub-pictures (`0xBD` with specific substream IDs).
+* **Decode the Packet Header:** Read the binary offsets inside the packet to find the exact display start time, end time, and memory address coordinates for where the subtitle graphic appears on screen.
+* **Parse the RLE Bitmap Payload:** The binary body consists of compressed pixel run-lengths. Your software reads the bit patterns to reconstruct a small bitmap image, applies a 4-color palette lookup table (defined in the control header), and renders it onto the video frame at the specified timestamp.
+
+---
+
+### Summary of the Fundamental Transformation
+
+At the lowest level, turning binary code into a file type is simply a matter of **pattern matching and header injection**:
+
+1. You use **sync words** (`0x000001B3` for video, `0x0B77` for audio) to slice the endless binary stream into logical chunks.
+2. You prepend the **container headers** that tell the computer's CPU how to interpret the math inside.
+3. You write the bytes to disk with the correct file extension, transforming raw optical disc reflections into standard files that any desktop operating system can open and execute.

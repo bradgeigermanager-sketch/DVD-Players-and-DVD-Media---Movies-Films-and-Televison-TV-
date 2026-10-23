@@ -1,0 +1,39 @@
+Following the descrambling and demultiplexing phase, where the MPEG Program Stream is split into independent elementary streams, the next and final computational phase of the pipeline is **MPEG-2 Video Decoding**.
+
+This stage takes the compressed **MPEG-2 Video Elementary Stream (.m2v)** and translates it back into uncompressed, full-color digital video frames. Here is how the MPEG-2 video decoding process works in full detail:
+
+---
+
+### 1. Variable Length Decoding (VLD)
+
+The incoming MPEG-2 stream uses Huffman coding (Variable Length Coding) to shrink data, meaning frequently occurring visual patterns require fewer bits to store.
+
+* **Bitstream Parsing:** The decoder reads the binary stream bit-by-bit, matching prefixes against the standard MPEG-2 VLC lookup tables.
+* **Unpacking Syntaxes:** This parsing extracts the fundamental building blocks of the video: **macroblock types, motion vectors, and quantized discrete cosine transform (DCT) coefficients**.
+
+### 2. Inverse Quantization
+
+During the original mastering and compression process, fine visual details were discarded through a process called quantization to save space.
+
+* **Scaling Back Up:** The decoder takes the quantized coefficient integers and multiplies them back up to their pre-quantized scale using matrix tables embedded in the video headers.
+
+### 3. Inverse Discrete Cosine Transform (IDCT)
+
+MPEG-2 divides each video frame into $8\times8$ pixel blocks and converts spatial pixel data into frequency coefficients using the Discrete Cosine Transform (DCT).
+
+* **Frequency to Spatial Domain:** The decoder runs the 2D IDCT mathematical formula across every $8\times8$ coefficient block.
+* This mathematical conversion transforms the frequency data back into actual spatial pixel differences—specifically, representing the uncompressed brightness and color difference values for that block.
+
+### 4. Motion Compensation (Rebuilding P and B Frames)
+
+Because P-frames (Predicted) and B-frames (Bi-directional) only store *changes* relative to other frames rather than complete images, the decoder must reconstruct them dynamically:
+
+* **Reference Frames:** The decoded baseline image (an I-frame) is held in a dedicated memory buffer.
+* **Vector Application:** For a P-frame or B-frame, the decoder reads the motion vectors extracted during VLD, shifts the reference blocks accordingly, and adds the spatial residual differences built during the IDCT step to fully reconstruct the predicted frame.
+
+### 5. Color Space Conversion and Frame Reordering
+
+* **YCrCb to RGB Conversion:** The fully reconstructed video frames exist in the $YCrCb$ (luma and chroma subsampled at 4:2:0) color space. The decoder upsamples the color channels and applies color matrix math to convert them into standard **RGB pixel arrays**.
+* **B-Frame Sorting:** Because B-frames require future reference frames to be decoded first, they arrive out of sequence in the stream. A sorting buffer re-orders the frames into the correct chronological playback sequence (displaying frame order $I, B, P$ instead of transmission order $I, P, B$).
+
+Once this final decoding loop completes, your original microscopic pits on the DVD surface have been fully processed through scanning, clock recovery, EFMPlus demodulation, Reed-Solomon error correction, CSS descrambling, demultiplexing, and MPEG-2 decoding into pristine, watchable video frames!

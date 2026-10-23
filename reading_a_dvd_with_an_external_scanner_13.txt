@@ -1,0 +1,47 @@
+Following the demodulation of EFMPlus symbols into raw data bytes and the assembly of those bytes into **2,048-byte physical sectors**, the next crucial stage in the pipeline is **Error Correction Coding (ECC) using Reed-Solomon Product Codes (RS-PC)**.
+
+Because optical media are vulnerable to scratches, dust, fingerprints, and manufacturing defects, this stage ensures that any physical damage on the disc surface is mathematically repaired before the data is ever unpacked into video and audio.
+
+Here is how the error correction process works in full detail:
+
+---
+
+### 1. The Structure of DVD Error Correction (RS-PC)
+
+DVDs do not rely on a single layer of error correction; instead, they use a two-dimensional block code known as **Reed-Solomon Product Code (RS-PC)**, specifically denoted as **RS(2048, 172, 16)** combined across inner and outer dimensions.
+
+* **The ECC Block:** The player gathers **16 consecutive data sectors** (each containing 2,048 bytes of user payload) and arranges them into a massive, two-dimensional matrix or grid comprising 192 rows by 172 columns.
+* **Parity Addition:** During mastering, the encoder appended extra mathematical check bytes (parity data) to the rows and columns of this grid:
+* **Outer Parity (PO):** Appended down the columns.
+* **Inner Parity (PI):** Appended across the rows.
+
+
+
+### 2. Syndrome Calculation (Detecting Errors)
+
+When your scanned and demodulated sectors arrive at the error correction engine, the system treats the data matrix as a set of mathematical polynomials and computes **syndromes**:
+
+* **Checking Validity:** The decoder evaluates the incoming bytes against the embedded parity formulas. If a row or column is entirely pristine, the syndrome calculation equals zero.
+* **Locating Corrupted Bytes:** If a scratch or dust particle corrupted a portion of the data, the syndromes yield non-zero values. The mathematical properties of Reed-Solomon codes allow the system to calculate both the *exact location* (which specific byte is wrong) and the *magnitude* of the error.
+
+### 3. Mathematical Correction (Erasure and Value Reconstruction)
+
+Once the error positions and values are isolated:
+
+* **Byte Correction:** The Reed-Solomon decoder solves systems of linear equations (using Galois Field arithmetic) to mathematically reverse the corruption and reconstruct the original, uncorrupted byte values.
+* **Erasure Pointers:** If a physical scratch is so severe that a section of data is completely obliterated beyond standard correction limits, the sync or demodulation layers pass "erasure flags" to the ECC engine, telling it exactly where the missing data is so it can dedicate its entire mathematical correction capacity to rebuilding those specific missing gaps.
+
+### 4. Outputting Pristine Data Sectors
+
+After the inner and outer parity checks complete across the entire 16-sector block:
+
+* All parity and overhead bytes are stripped away.
+* The system outputs a continuous, 100% bit-perfect stream of verified **2,048-byte data sectors**.
+
+---
+
+### What Comes Next?
+
+Once error correction hands over a pristine, verified stream of data sectors, the pipeline moves to **Descrambling (CSS)** to unlock copy-protected commercial content, followed by **Demultiplexing (De-MUX)** to separate the interleaved MPEG Program Stream into independent video, audio, and subtitle streams.
+
+Would you like to explore the **CSS descrambling and demultiplexing** phase next in full detail?

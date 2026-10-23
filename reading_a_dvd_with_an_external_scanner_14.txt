@@ -1,0 +1,41 @@
+Following the error correction phase, where pristine **2,048-byte data sectors** are assembled and verified, the next critical stage in the pipeline is **Descrambling and Demultiplexing (De-MUX)**.
+
+Because commercial DVDs are encrypted and combine multiple media streams into a single file, this stage unlocks the data and splits it into independent paths. Here is how it works in full detail:
+
+---
+
+### 1. Content Scrambling System (CSS) Descrambling
+
+Commercial movies are encrypted using **CSS (Content Scrambling System)** to prevent unauthorized duplication.
+
+* **The Problem:** Even though error correction has given you clean data sectors, the payload bytes inside those sectors are still scrambled using a pseudo-random cipher. If you tried to parse them directly, they would look like random noise.
+* **Key Exchange & Authentication:** A DVD player (or software decoder) must authenticate with the drive to exchange decryption keys. Once verified, the player obtains the disc key and player keys.
+* **LFSR Desynchronization:** The descrambler runs a hardware-based or software-based **Linear Feedback Shift Register (LFSR)** algorithm using those keys. It generates a matching pseudo-random byte sequence and performs an exclusive-OR (XOR) operation on the encrypted sector payload, instantly revealing the clean, unencrypted plaintext data.
+
+### 2. MPEG Program Stream Parsing (Demultiplexing)
+
+Once descrambled, the continuous stream of bytes forms an **MPEG Program Stream**. Unlike a single computer file, a DVD program stream is heavily multiplexed—meaning video frames, multiple audio languages, director commentaries, and subtitle overlays are chopped into small packets and interleaved together.
+
+* **Reading Pack Headers:** The demultiplexer scans the stream for pack start codes (specifically `0x000001BA`) and system headers. These headers contain vital timing information, including the **System Clock Reference (SCR)**, which tells the player the exact timeline for playback.
+* **Packet Identification (Stream IDs):** Inside each pack are individual packets labeled with specific Stream IDs:
+* Video packets (typically designated around `0x000001E0` to `0x000001EF`)
+* Audio packets, such as Dolby Digital / AC-3 (`0x000001BD` or `0x000001C0` range)
+* Sub-picture / Subtitle packets (`0x000001BD` with specific substream IDs)
+
+
+
+### 3. Routing to Independent Buffers
+
+As the demultiplexer reads each packet header, it strips away the Program Stream wrapping and routes the payload data into separate, dedicated memory buffers:
+
+* The compressed **MPEG-2 video stream** is fed directly into the video decoder queue.
+* The compressed **audio streams** are routed to the audio decoder pipeline.
+* The **subtitle graphics** are routed to the sub-picture processor.
+
+---
+
+### What Comes Next?
+
+With the data successfully descrambled and demultiplexed into an isolated **MPEG-2 Video Elementary Stream (.m2v)**, the pipeline moves into the final computational phase: **MPEG-2 Video Decoding** (Variable Length Decoding, Inverse Quantization, IDCT, and Motion Compensation) to turn those compressed blocks back into full-color video frames.
+
+Would you like to dive into the exact math and mechanics of **Variable Length Decoding (VLD) and the Discrete Cosine Transform (DCT)** next?

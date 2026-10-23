@@ -1,0 +1,40 @@
+**Sync Word Detection** is the foundational synchronization mechanism used in optical and digital storage formats (like DVDs and CDs) to establish framing boundaries. Because a continuous stream of demodulated bits looks like an endless wall of ones and zeros, the decoder needs a precise, repeating "anchor" to know where one data block ends and the next begins.
+
+Here is how the sync word detection process works in full detail:
+
+---
+
+### 1. The Role of the Sync Word in the Physical Stream
+
+Before raw user data is written to a DVD, it is organized into rigid structural blocks called **physical sectors** or **frames**.
+
+* To prevent the reader from drifting out of alignment over thousands of continuous bits, specific, highly unique bit patterns—known as **sync words** or **sync codes**—are inserted at regular intervals (at the start of every sync frame or data row).
+* These sync patterns are intentionally chosen so that they **never** naturally occur within the random payload data or parity bytes of the stream. This guarantees that when the decoder spots the sync word, there is zero ambiguity about its location.
+
+### 2. Continuous Bitstream Ingestion and Shifting
+
+As the demodulated channel bits or raw data bytes flow out of the demodulation stage, they enter the sync detector hardware (or software pipeline):
+
+* **Shift Register / Sliding Window:** The incoming stream is fed into a hardware shift register (a series of flip-flops) or a software sliding bit-window that matches the exact length of the sync word (e.g., a specific 32-bit or 16-bit sequence).
+* **Real-Time Comparison:** With every single clock cycle (as each new bit or byte enters), the entire contents of the shift register are compared simultaneously against the known, hardcoded binary signature of the valid sync word.
+
+### 3. Bit-Error Tolerance and Correlation
+
+In real-world scenarios, scratches, dust, or microscopic surface irregularities on a disc can corrupt bits, meaning a sync word might arrive slightly damaged (e.g., with 1 or 2 flipped bits).
+
+* **Threshold Matching (Hamming Distance):** Rather than requiring a 100% rigid bit-for-bit match (which could cause the player to lose sync entirely due to a tiny scratch), advanced sync detectors use a correlation threshold or calculate the **Hamming distance**.
+* If the incoming bit pattern matches the expected sync word within an acceptable error tolerance (e.g., 14 out of 16 bits match), the detector flags a **positive sync match**.
+
+### 4. Frame Alignment and State Machine Triggering
+
+Once a valid sync word is positively identified, it triggers a cascade of actions to structure the chaotic stream:
+
+* **Resetting the Counter:** The detector resets internal byte and bit counters. It marks the exact memory address where the sync word ends as Sheridan-level ground zero for the upcoming data payload.
+* **Payload Framing:** Knowing precisely where the sync word is, the system routes the subsequent fixed number of bytes into their designated processing buffers (such as routing the next 2,048 bytes into the Reed-Solomon error correction and sector assembly pipelines).
+
+### 5. Freewheeling and Protection Against False Positives
+
+What happens if a random sequence of data happens to accidentally mimic the sync word? To prevent the player from misaligning its frames due to a false positive, the sync detector employs a **state machine** (often called a Flywheel or Freewheeling circuit):
+
+* **Expected Window:** The sync detector knows *exactly* how many bits are in a standard frame. Instead of constantly hunting blindly across the entire stream, it "sleeps" and only opens its comparison window right around the exact clock cycle the next sync word *should* arrive.
+* **Confidence Checks:** If the sync word fails to appear right on schedule, the system doesn't immediately panic. It enters a "freewheeling" mode, relying on internal clock timing to maintain frame alignment for a few cycles. Only if sync words are missed consistently over multiple frames does the system declare a loss of sync and initiate a full re-synchronization search across the entire stream.

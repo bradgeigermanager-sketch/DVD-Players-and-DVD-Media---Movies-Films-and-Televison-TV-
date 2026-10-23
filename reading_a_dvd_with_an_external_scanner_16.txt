@@ -1,0 +1,30 @@
+Following the MPEG-2 video decoding phase—where frames are unpacked, inverse-quantized, inverse-discrete-cosine transformed, motion-compensated, color-converted, and reordered—the final step in the pipeline is **Display and Rendering**.
+
+Here is how the decoded frames are finally sent to your screen:
+
+---
+
+### 1. Frame Buffering and Vertical Sync (VSync)
+
+Once the uncompressed RGB or YCrCb frames emerge from the decoding pipeline, they cannot be sent straight to the display in a chaotic manner, or you would experience visual "tearing" (where half of one frame displays alongside half of another).
+
+* **Frame Buffering:** The video frames are held in a series of output frame buffers (typically a double-buffer or triple-buffer setup).
+* **Clock Synchronization:** The system synchronizes the release of each frame with the display's refresh rate (e.g., 59.94 Hz for NTSC or 50 Hz for PAL) using system clock references embedded in the original MPEG stream, ensuring smooth, jitter-free playback.
+
+### 2. Video Scaling and De-interlacing (If Applicable)
+
+Standard DVDs output either interlaced video (where odd and even lines are split into alternating fields, common on older CRT televisions) or progressive video.
+
+* **De-interlacing:** If played on a modern progressive-scan display (like an LCD or OLED monitor/TV), a de-interlacer algorithm weaves the alternating fields together or interpolates missing lines to turn interlaced fields into clean, full progressive frames.
+* **Aspect Ratio Correction & Scaling:** The hardware or software upscales the standard-definition resolution ($720\times480$ or $720\times576$) to match your display's native resolution, applying anamorphic scaling factors if the source material was filmed in widescreen ($16:9$).
+
+### 3. Final Digital-to-Analog or HDMI Output
+
+* **Digital Transmission:** For modern setups, the processed pixel stream is packetized into an **HDMI** signal alongside the synchronized uncompressed audio streams and sent digitally to your TV or monitor.
+* **Analog Conversion (Legacy):** For older cathode-ray tube (CRT) or analog displays, Digital-to-Analog Converters (DACs) translate the digital pixel values into analog electrical voltages for Composite, S-Video, or Component cables.
+
+---
+
+This completes the entire microscopic-to-screen journey—turning tiny physical pits on a plastic disc into a fully rendered, moving picture!
+
+Since we have traced the entire DVD pipeline from the surface scan all the way to display rendering, is there a particular area you'd like to dive deeper into next?

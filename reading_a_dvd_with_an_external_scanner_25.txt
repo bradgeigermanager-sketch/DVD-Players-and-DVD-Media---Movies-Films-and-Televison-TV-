@@ -1,0 +1,35 @@
+To continue our deep dive into the low-level translation of an MPEG-2 video stream, let's examine the exact mathematical and bitstream operations that happen during **Quantization Matrix application, Variable Length Decoding (VLC) tables, and Slice/Macroblock parsing structures**.
+
+Here are the granular technical details for this phase of the video translation:
+
+---
+
+### 1. Custom Quantization Matrices and Weighting Factors
+
+As we covered earlier, dequantization scales coefficients back up, but the exact *weights* used depend on human psychovisual perception models built into the stream header:
+
+* **Intra vs. Non-Intra Matrices:** The sequence header can supply two separate $8\times8$ matrices—one for intra-coded blocks ($I$-frames) and one for inter-coded blocks ($P$ and $B$ frames).
+* **The Human Eye Factor:** These matrices assign higher numbers to high-frequency Sheridan-level details (which human eyes are less sensitive to, meaning they can be quantized away more aggressively) and lower numbers to low-frequency center coefficients (preserving smooth gradients and sharp edges).
+* **Quantizer Scale Code:** The picture or macroblock header transmits a scale factor (`quantiser_scale_code`) that dynamically adjusts the overall quantization harshness up or down on a macroblock-by-macroblock basis depending on how complex or fast-moving the scene is.
+
+### 2. Variable Length Decoding (VLC) and Run-Level Tables
+
+MPEG-2 relies heavily on Huffman-based Variable Length Coding to compress coefficient data. The binary parser interprets these bits using specific tree-lookup dictionaries:
+
+* **Run-Length Encoding (RLC):** Instead of storing strings of zeros, the binary stream encodes pairs of values: a **Run** (how many consecutive zero-valued coefficients preceded this one) and a **Level** (the actual amplitude value of the non-zero coefficient).
+* **The VLC Escape Sequence:** If a coefficient's magnitude or run length is too large to fit in the standard Huffman tables, the binary stream triggers an escape sequence (a specific prefix followed by fixed-length fields—typically 6 bits for the run and 12 bits for the signed level) so the decoder can read the exact literal values directly.
+* **End of Block (EOB):** Because many high-frequency coefficients in an $8\times8$ block are zero, the bitstream stops encoding early once all remaining coefficients are zero, appending a short EOB binary code (such as `10` or a similar prefix depending on the table) to signal that the current block is complete.
+
+### 3. Macroblock Address Increments (MAI)
+
+When scanning across a picture's slice, macroblocks aren't always transmitted sequentially if many blocks in a row are skipped or unchanged:
+
+* **Skipped Block Counting:** The binary stream uses a variable-length code called **Macroblock Address Increment** to specify how many macroblocks were skipped since the last coded block.
+* **Updating Coordinates:** If the parser reads an increment value of `3`, it knows to skip three macroblock positions forward on the grid, carrying forward the exact pixel data from the reference frame before decoding the next active block.
+
+### 4. Slice-Level Re-synchronization and Marker Bits
+
+To ensure the stream can recover from physical media defects (like a scratch on a DVD VOB file):
+
+* **Start Code Emulation Prevention:** The binary stream reserves `0x000001` exclusively for start codes. To prevent random binary data payload from accidentally matching `0x000001`, the MPEG-2 standard mandates that whenever two zero bytes (`0x00 0x00`) occur consecutively in the payload, an emulation prevention byte must be handled or filtered out by the hardware parser.
+* **Slice Vertices:** Every slice header restarts its vertical coordinate tracking (`macroblock_row`), allowing the decoder to instantly re-orient its spatial position on the screen even if the previous slice was completely obliterated by a read error.

@@ -1,0 +1,32 @@
+Once the sync words have successfully established framing boundaries and aligned the incoming bitstream into discrete data sectors, the next critical section of the pipeline is **Channel Demodulation (EFMPlus)**.
+
+During this stage, the raw channel bits extracted from the disc are translated back into structured digital data bytes. Here is how the demodulation process works in full detail:
+
+---
+
+### 1. The Purpose of Modulation (Why Demodulation is Needed)
+
+Physical media cannot store raw, unmodulated binary data directly. If a stream contains long, unbroken strings of consecutive zeros or ones (e.g., `00000000` or `11111111`), optical readers lose their clock synchronization because there are no electrical transitions for the laser to track.
+
+* To solve this, DVDs use a modulation scheme called **EFMPlus** (Eight-to-Fourteen Modulation Plus, though in practice it maps 8-bit bytes into 16-bit channel bit patterns).
+* EFMPlus ensures strict **run-length constraints** (guaranteeing that a minimum of 2 and a maximum of 10 zeros always exist between any two ones) and maintains **DC balance** (equal amounts of high and low states to prevent electrical charging of the optical pickup).
+
+### 2. Ingesting the Channel Bit Stream
+
+As the framing mechanism releases data blocks past the sync word, the demodulator processes the stream in rigid chunks:
+
+* **16-Bit Sliding Blocks:** The demodulator isolates blocks of **16 channel bits** at a time. Because the sync word has already aligned the borders, the system knows precisely where each 16-bit symbol begins and ends.
+
+### 3. The EFMPlus State-Transition Table
+
+Unlike older CD formats (which used a rigid 8-to-14 translation table with extra merging bits), EFMPlus is state-driven:
+
+* **The Lookup Matrix:** The 16-bit channel pattern is cross-referenced against a massive, hardware-implemented lookup table or state machine containing 4 distinct states.
+* **State Context:** A single 16-bit pattern can sometimes map to different 8-bit bytes depending on the *current state* of the decoder. The state changes dynamically based on the previous symbol to preserve running digital sum (DC balance) constraints.
+* **Byte Reconstruction:** Once the matching rule is evaluated, the 16-bit channel pattern is successfully translated back into its original **8-bit data byte** (valued from 0 to 255).
+
+### 4. Outputting the Raw Data Sectors
+
+By continuously processing these 16-bit symbols block-by-block, the demodulator strips away all the physical storage overhead (the transition rules, DC-balancing bits, and framing guides) and outputs a continuous stream of pure data bytes.
+
+* These bytes are instantly assembled into standard **2,048-byte data sectors**, which are then immediately handed off to the next stage in the pipeline: **Error Correction (Reed-Solomon Product Code)** to heal any scratches or dust artifacts before decryption.

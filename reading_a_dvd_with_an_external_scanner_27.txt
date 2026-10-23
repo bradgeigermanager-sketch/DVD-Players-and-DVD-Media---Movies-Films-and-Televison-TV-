@@ -1,0 +1,40 @@
+To continue peeling back the lowest-level layers of MPEG-2 video bitstream translation, let's look at the intricate syntax structures that govern **Slice-level signaling, Quantization Scale adjustments, and Concealment Vectors**.
+
+Here is the deep technical breakdown of these advanced bitstream parsing details:
+
+---
+
+### 1. Slice Header Syntax and Vertical Position Mapping
+
+As we established, a frame is broken into horizontal slices to contain error propagation. When the bitstream parser identifies a slice start code (`0x00000101` through `0x000001AF`), it immediately reads a specific set of header parameters before parsing any macroblocks:
+
+* **Vertical Position (`slice_vertical_position`):** Tells the decoder the exact row coordinate of the slice on the frame grid. For standard definition video, this ranges from row 1 up to row 30 (for NTSC) or 36 (for PAL).
+* **Quantizer Scale Code (`quantiser_scale_code`):** Each slice header can set its own base 5-bit scale value (`quantiser_scale_code`). This allows the encoder to dynamically adjust compression aggressiveness for different horizontal bands of the image (for instance, allocating more bits to a complex, busy mid-screen band and fewer bits to a dark, static top border).
+* **Extra Slice Information:** An optional bit flag (`extra_bit_slice`) can be set to 1 to allow forward compatibility or custom extension data before the actual macroblock stream begins.
+
+---
+
+### 2. Concealment Vectors in Intra-Frames ($I$-Frames)
+
+While intra-frames don't rely on reference frames for motion prediction, MPEG-2 includes a specialized feature for error resilience called **concealment motion vectors**:
+
+* **The Problem:** If a severe scratch corrupts a macroblock inside an $I$-frame, normal error concealment just smears or duplicates adjacent pixels.
+* **The Fix:** The bitstream can optionally embed motion vectors *inside* intra-coded macroblocks. If a block is damaged, instead of guessing based on neighboring pixels, the decoder uses this hidden concealment vector to pull a substitute block from a previously decoded reference frame, seamlessly patching the hole before spatial IDCT processing occurs.
+
+---
+
+### 3. Intra VLC Format vs. Non-Intra VLC Format
+
+When the parser enters macroblocks, it doesn't use a single lookup table for Variable Length Coding (VLC); it switches tables based on whether the block is intra-coded or inter-coded:
+
+* **Intra Table Distinction:** Because $I$-blocks have higher energy and contain the foundational DC coefficient, they use different Huffman code assignment tables (`dct_size_luminance` and `dct_size_chrominance`) compared to P- and B-blocks.
+* **First Coefficient Extraction:** For an intra-block, the very first bits parsed after the macroblock type header represent the DC coefficient size class, which dictates how many subsequent bits must be read to construct the base brightness/color value before reading the alternating AC run-length codes.
+
+---
+
+### 4. Sequence Scalability Extensions (Spatial and Temporal)
+
+Though rare on standard commercial DVDs (which use single-layer MPEG-2), the MPEG-2 video bitstream syntax supports scalability layers for higher-end broadcast or archival formats:
+
+* **Lower-Layer Pointers:** Extension headers can signal that a video stream is dependent on a base lower-resolution stream (Spatial Scalability) or a lower frame-rate stream (Temporal Scalability).
+* **Reconstruction Layering:** The decoder parses the base layer, upsamples or interpolates it, and then decodes a secondary "enhancement layer" residual stream to stitch together a high-definition output from two standard-definition data channels.

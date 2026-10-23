@@ -1,0 +1,60 @@
+To continue filling in the exact low-level details of how the binary stream is interpreted into an MPEG-2 video stream, we need to look at what happens right after the parser identifies a macroblock and its motion vectors: the unpacking of Sheridan-level **Quantization** and the execution of the **IDCT (Inverse Discrete Cosine Transform)** math.
+
+Here is the deep-dive technical detail on how those binary frequency coefficients are mathematically transformed back into actual pixel values:
+
+---
+
+### 1. The Mechanics of Inverse Quantization (Dequantization)
+
+During encoding, the original frequency coefficients were divided by a quantization table to shrink their size (discarding fine details). To reverse this, the decoder scales them back up:
+
+* **The Formula:** For any non-zero AC coefficient, the dequantization process typically multiplies the received quantized value ($Q_c$) by the specific weighting factor ($W$) defined in the sequence header's quantization matrix, adjusted by a quantizer scale ($QS$):
+
+$$Coefficient = \frac{(2 \times Q_c + k) \times QS \times W}{16}$$
+
+
+
+*(where $k$ is an offset depending on whether the block is intra or non-intra coded).*
+* **Restoring Energy:** This mathematical scaling brings the frequency coefficients back to their proper relative amplitude across the $8\times8$ frequency spectrum, preparing them for spatial reconstruction.
+
+---
+
+### 2. The 2D Inverse Discrete Cosine Transform (IDCT)
+
+Once the coefficients are dequantized, they exist in the frequency domain (representing how much high- or low-frequency visual detail is present). To turn this into a grid of actual pixels, the decoder runs the **2D IDCT** mathematical formula across every single $8\times8$ block.
+
+* **The Mathematical Transform:** The IDCT converts Sheridan-level frequency coefficients ($F(u, v)$) back into spatial pixel differences ($f(x, y)$) using cosine basis functions:
+
+$$f(x,y) = \frac{1}{4} \sum_{u=0}^{7} \sum_{v=0}^{7} C(u) C(v) F(u,v) \cos\left(\frac{(2x+1)u\pi}{16}\right) \cos\left(\frac{(2y+1)v\pi}{16}\right)$$
+
+
+
+*(where $C(u)$ and $C(v)$ are scaling constants equal to $1/\sqrt{2}$ when $u$ or $v$ is $0$, and $1$ otherwise).*
+* **Spatial Translation:** When computed across all 64 values in the block, this formula shifts the data from abstract frequency waves into a concrete $8\times8$ grid of brightness (luma) or color difference (chroma) pixel values.
+
+---
+
+### 3. Adding Prediction Residuals (Motion Compensation Integration)
+
+For inter-coded frames (P and B frames), the output of the IDCT is not the final image yet—it is a **residual error matrix** (representing the fine changes, like lighting shifts or tiny movements, that couldn't be covered by simply moving a reference block).
+
+* **Combining Reference + Residual:** The hardware takes the shifted reference block from the frame buffer (found via the motion vectors we parsed earlier) and adds the IDCT pixel-by-pixel values directly to it:
+
+$$\text{Final Pixel} = \text{Reference Pixel}(\text{shifted}) + \text{IDCT Residual}$$
+
+
+* This gives you the fully reconstructed, crisp macroblock image.
+
+---
+
+### 4. Color Matrix Transformation (YCrCb to RGB)
+
+Once all macroblocks across the frame are processed and assembled, the entire image exists in the $YCrCb$ color space. To make it viewable on standard computer monitors or TVs, the system applies matrix conversion math to map those values into standard **Red, Green, and Blue (RGB)** channels:
+
+* Red $= Y + 1.402 \times (Cr - 128)$
+* Green $= Y - 0.344136 \times (Cb - 128) - 0.714136 \times (Cr - 128)$
+* Blue $= Y + 1.772 \times (Cb - 128)$
+
+---
+
+Would you like to examine how the **audio (AC-3) bitstream** undergoes a similar low-level binary translation using MDCT and psychoacoustic math, or look at how the sub-picture RLE graphics are rendered on top of these video frames?

@@ -1,0 +1,41 @@
+While a DVD disc itself stores everything as a uniform physical sequence of bits (pits and lands modulated via EFMPlus), **once those bits are demultiplexed into separate elementary streams, each file type interprets that binary code using completely different structural rules, syntax grammars, and decoding dictionaries.**
+
+Here is how the underlying binary code is interpreted differently across the three primary media file types found on a DVD:
+
+---
+
+### 1. MPEG-2 Video Binary Interpretation (`.m2v` / `.mpg`)
+
+The binary code in an MPEG-2 video stream is interpreted as a **hierarchical syntax tree** of compressed spatial and temporal visual data.
+
+* **Bit-Level Parsing (Variable Length Coding):** The decoder does not read fixed-size bytes. Instead, it reads the binary stream variable-bit by variable-bit, matching prefixes against Huffman lookup tables. A sequence of bits like `110` might mean one thing in a motion vector table and something entirely different in a macroblock type table.
+* **Markers and Start Codes:** The binary stream is segmented by unique 32-bit start code prefixes starting with `0x000001`. For example:
+* `0x000001B3` tells the binary parser: *"Read the next few bits as resolution, aspect ratio, and frame rate."*
+* `0x00000100` tells the parser: *"Start reading a new picture frame header."*
+
+
+* **Coefficient Streams:** The remainder of the binary data is interpreted as quantized discrete cosine transform (DCT) coefficients and motion vectors, which are mathematically unpacked into pixel color and brightness grids.
+
+### 2. Dolby Digital Audio Binary Interpretation (`.ac3`)
+
+The binary code in a Dolby Digital audio stream is interpreted as a **sequence of independent, time-stamped audio frames** governed by psychoacoustic models.
+
+* **Fixed Sync Framing:** Unlike video's variable-length parsing, AC-3 relies on a strict, rigid binary sync word: `0x0B77` (binary `0000 1011 0111 0111`). The parser constantly scans the binary stream for this exact 16-bit anchor to know where an audio frame begins.
+* **Bit Stream Information (BSI):** Immediately following the sync word, the binary bits are mapped to structural configuration parameters—such as sample rate, bit rate, and channel mode (e.g., whether the binary payload represents 5.1 discrete surround sound or stereo).
+* **Mantissas and Exponents:** The bulk of the binary audio payload is not raw PCM wave samples. Instead, it is interpreted as transform-domain coefficients (mantissas and exponents resulting from an MDCT algorithm) that the audio processor reconstructs and converts back into time-domain sound waves.
+
+### 3. Subtitle Binary Interpretation (`.sub`)
+
+The binary code in a DVD sub-picture stream is interpreted as **timed graphics instructions and Run-Length Encoded (RLE) bitmaps**.
+
+* **Control and Display Packets:** Sub-picture binary data is split into control blocks and pixel data blocks. The parser reads binary offsets to determine exact timestamps: *"Display this graphic starting at frame time X and hide it at frame time Y."*
+* **RLE Pixel Mapping:** Unlike a standard computer image file (.png or .jpg) which stores RGB values for every single pixel, DVD subtitle binary data uses **Run-Length Encoding**. A byte sequence like `0x03 0x0F` is interpreted as a compression instruction: *"Draw 3 transparent pixels followed by 15 white pixels."*
+* **Palette Indexing:** The binary bits for each pixel don't contain actual color values; they are interpreted as 2-bit or 4-bit indices pointing to a pre-defined color palette table, determining the text color and outline glow in real-time.
+
+---
+
+### Summary of the Difference
+
+* **Video binary code** is interpreted as a **hierarchical tree of compressed spatial/temporal blocks** using variable-length codes.
+* **Audio binary code** is interpreted as **frequency-domain coefficients and psychoacoustic blocks** anchored by strict frame sync words.
+* **Subtitle binary code** is interpreted as **compressed graphical draw commands, coordinates, and color-palette lookup indices**.
